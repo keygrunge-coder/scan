@@ -2,226 +2,477 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Scanner Resi</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
 
-<script src="https://unpkg.com/html5-qrcode"></script>
+<title>Scan Paket</title>
+
+<script src="https://unpkg.com/@zxing/library@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <style>
 body{
-    font-family:Arial,sans-serif;
-    padding:15px;
-    background:#f5f5f5;
+font-family:Arial,sans-serif;
+margin:10px;
+background:#f5f5f5;
 }
+
 h2{
-    text-align:center;
+text-align:center;
 }
-#reader{
-    width:100%;
-    max-width:500px;
-    margin:auto;
+
+video{
+width:100%;
+max-height:350px;
+background:black;
+border-radius:10px;
 }
+
 button{
-    padding:10px;
-    margin:5px;
-    cursor:pointer;
+padding:10px;
+margin:3px;
 }
-table{
-    width:100%;
-    border-collapse:collapse;
-    background:white;
+
+input{
+padding:10px;
+width:100%;
+box-sizing:border-box;
+margin-bottom:10px;
 }
-th,td{
-    border:1px solid #ddd;
-    padding:8px;
-    text-align:left;
+
+.card{
+background:white;
+padding:10px;
+border-radius:10px;
+margin-bottom:10px;
 }
-th{
-    background:#eee;
-}
-.duplicate{
-    color:red;
-    font-weight:bold;
-}
+
 .success{
-    color:green;
-    font-weight:bold;
+color:green;
+font-weight:bold;
+}
+
+.error{
+color:red;
+font-weight:bold;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+background:white;
+}
+
+th,td{
+border:1px solid #ddd;
+padding:6px;
+font-size:12px;
+}
+
+th{
+background:#eee;
 }
 </style>
 </head>
 <body>
 
-<h2>Scanner Resi</h2>
+<h2>SCAN PAKET</h2>
 
-<p>Total Resi: <span id="total">0</span></p>
-
-<div id="reader"></div>
+<div class="card">
 
 <div>
-<button onclick="exportCSV()">Export CSV</button>
-<button onclick="hapusSemua()">Hapus Semua</button>
+J&T : <span id="jt">0</span> |
+SPX : <span id="spx">0</span> |
+Lazada : <span id="lzd">0</span> |
+Lainnya : <span id="other">0</span>
+</div>
+
+<h3>Total : <span id="total">0</span></h3>
+
+</div>
+
+<video id="video"></video>
+
+<div style="margin-top:10px">
+
+<button onclick="startScanner()">Mulai Scan</button>
+
+<button onclick="toggleTorch()">
+Flash
+</button>
+
+<button onclick="exportExcel()">
+Export Excel
+</button>
+
+<button onclick="hapusSemua()">
+Hapus Semua
+</button>
+
 </div>
 
 <p id="status"></p>
 
+<input
+type="text"
+id="search"
+placeholder="Cari Resi..."
+onkeyup="render()">
+
 <table>
+
 <thead>
 <tr>
 <th>No</th>
+<th>Kurir</th>
 <th>Resi</th>
 <th>Waktu</th>
 <th>Aksi</th>
 </tr>
 </thead>
+
 <tbody id="tbody"></tbody>
+
 </table>
 
 <script>
 
-let data = JSON.parse(localStorage.getItem("resiData")) || [];
+let data=
+JSON.parse(
+localStorage.getItem("scanData")
+)||[];
 
-function simpan(){
-    localStorage.setItem("resiData", JSON.stringify(data));
+let codeReader;
+let selectedDeviceId;
+let currentTrack;
+
+function saveData(){
+localStorage.setItem(
+"scanData",
+JSON.stringify(data)
+);
+}
+
+function beep(){
+
+const ctx=
+new (
+window.AudioContext||
+window.webkitAudioContext
+)();
+
+const osc=
+ctx.createOscillator();
+
+osc.frequency.value=1000;
+
+osc.connect(ctx.destination);
+
+osc.start();
+
+osc.stop(
+ctx.currentTime+0.15
+);
+
+}
+
+function vibrate(){
+navigator.vibrate?.(150);
+}
+
+function getCourier(resi){
+
+const r=
+resi.toUpperCase();
+
+if(
+r.startsWith("JT")||
+r.startsWith("JP")||
+r.startsWith("JX")||
+r.startsWith("JD")||
+r.startsWith("JNT")
+){
+return "J&T";
+}
+
+if(
+r.startsWith("SPX")||
+r.startsWith("SPXID")
+){
+return "SPX";
+}
+
+if(
+r.startsWith("LEX")||
+r.startsWith("LZD")||
+r.startsWith("LAZ")
+){
+return "Lazada";
+}
+
+return "Lainnya";
+}
+
+function addResi(resi){
+
+resi=resi.trim();
+
+if(
+data.some(
+x=>x.resi===resi
+)
+){
+
+document.getElementById(
+"status"
+).innerHTML=
+"<span class='error'>DUPLIKAT</span>";
+
+return;
+}
+
+beep();
+vibrate();
+
+const item={
+resi,
+kurir:getCourier(resi),
+waktu:new Date()
+.toLocaleString("id-ID")
+};
+
+data.unshift(item);
+
+saveData();
+render();
+
+document.getElementById(
+"status"
+).innerHTML=
+"<span class='success'>SCAN BERHASIL</span>";
+
 }
 
 function render(){
 
-    document.getElementById("tbody").innerHTML="";
+const keyword=
+document.getElementById(
+"search"
+).value.toLowerCase();
 
-    data.forEach((item,index)=>{
+const tbody=
+document.getElementById(
+"tbody"
+);
 
-        let tr=document.createElement("tr");
+tbody.innerHTML="";
 
-        tr.innerHTML=`
-        <td>${index+1}</td>
-        <td>${item.resi}</td>
-        <td>${item.waktu}</td>
-        <td>
-            <button onclick="lacak('${item.resi}')">Lacak</button>
-            <button onclick="hapus(${index})">Hapus</button>
-        </td>
-        `;
+let jt=0;
+let spx=0;
+let lzd=0;
+let other=0;
 
-        document.getElementById("tbody").appendChild(tr);
+data.forEach((item,index)=>{
 
-    });
-
-    document.getElementById("total").textContent=data.length;
+if(
+!item.resi
+.toLowerCase()
+.includes(keyword)
+){
+return;
 }
 
-function waktuSekarang(){
+if(item.kurir==="J&T") jt++;
+else if(item.kurir==="SPX") spx++;
+else if(item.kurir==="Lazada") lzd++;
+else other++;
 
-    let d=new Date();
+const tr=
+document.createElement("tr");
 
-    return d.toLocaleString('id-ID');
+tr.innerHTML=`
+<td>${index+1}</td>
+<td>${item.kurir}</td>
+<td>${item.resi}</td>
+<td>${item.waktu}</td>
+<td>
+<button onclick="hapus(${index})">
+X
+</button>
+</td>
+`;
+
+tbody.appendChild(tr);
+
+});
+
+document.getElementById("jt").textContent=jt;
+document.getElementById("spx").textContent=spx;
+document.getElementById("lzd").textContent=lzd;
+document.getElementById("other").textContent=other;
+
+document.getElementById(
+"total"
+).textContent=data.length;
+
 }
 
-function tambahResi(resi){
+function hapus(i){
 
-    resi=resi.trim();
+if(
+confirm("Hapus data?")
+){
 
-    if(data.some(x=>x.resi===resi)){
+data.splice(i,1);
 
-        document.getElementById("status").innerHTML=
-        "<span class='duplicate'>Resi sudah pernah discan</span>";
+saveData();
 
-        return;
-    }
+render();
 
-    navigator.vibrate?.(150);
-
-    data.unshift({
-        resi:resi,
-        waktu:waktuSekarang()
-    });
-
-    simpan();
-    render();
-
-    document.getElementById("status").innerHTML=
-    "<span class='success'>Berhasil scan</span>";
 }
 
-function hapus(index){
-
-    if(confirm("Hapus data ini?")){
-
-        data.splice(index,1);
-
-        simpan();
-        render();
-    }
 }
 
 function hapusSemua(){
 
-    if(confirm("Hapus semua data?")){
+if(
+confirm("Hapus semua?")
+){
 
-        data=[];
+data=[];
 
-        simpan();
-        render();
-    }
-}
-
-function exportCSV(){
-
-    let csv="No,Resi,Waktu Scan\n";
-
-    data.forEach((item,index)=>{
-
-        csv+=`${index+1},"${item.resi}","${item.waktu}"\n`;
-
-    });
-
-    let blob=new Blob([csv],{
-        type:"text/csv;charset=utf-8;"
-    });
-
-    let link=document.createElement("a");
-
-    link.href=URL.createObjectURL(blob);
-
-    link.download="hasil_scan_resi.csv";
-
-    link.click();
-}
-
-function lacak(resi){
-
-    window.open(
-        "https://t.17track.net/en#nums="+encodeURIComponent(resi),
-        "_blank"
-    );
-}
+saveData();
 
 render();
 
-const html5QrCode = new Html5Qrcode("reader");
+}
 
-Html5Qrcode.getCameras()
-.then(devices => {
+}
 
-    if(devices && devices.length){
+async function startScanner(){
 
-        html5QrCode.start(
-            { facingMode: "environment" },
-            {
-                fps:10,
-                qrbox:250
-            },
-            decodedText => {
+codeReader=
+new ZXing.BrowserMultiFormatReader();
 
-                tambahResi(decodedText);
+const devices=
+await codeReader.listVideoInputDevices();
 
-            }
-        );
-    }
-})
-.catch(err => {
+selectedDeviceId=
+devices[0].deviceId;
 
-    alert("Kamera tidak tersedia");
+codeReader.decodeFromVideoDevice(
+selectedDeviceId,
+"video",
+(result,error)=>{
+
+if(result){
+
+addResi(result.text);
+
+}
+
+}
+);
+
+}
+
+async function toggleTorch(){
+
+try{
+
+const video=
+document.querySelector("video");
+
+const track=
+video.srcObject
+.getVideoTracks()[0];
+
+const capabilities=
+track.getCapabilities();
+
+if(
+capabilities.torch
+){
+
+window.torchOn=
+!window.torchOn;
+
+await track.applyConstraints({
+advanced:[
+{
+torch:
+window.torchOn
+}
+]
 });
+
+}
+
+}catch(e){}
+
+}
+
+function exportExcel(){
+
+const jt=
+data.filter(
+x=>x.kurir==="J&T"
+);
+
+const spx=
+data.filter(
+x=>x.kurir==="SPX"
+);
+
+const laz=
+data.filter(
+x=>x.kurir==="Lazada"
+);
+
+const other=
+data.filter(
+x=>x.kurir==="Lainnya"
+);
+
+const wb=
+XLSX.utils.book_new();
+
+function addSheet(
+name,
+rows
+){
+
+const sheet=
+XLSX.utils.json_to_sheet(
+rows.map(
+(x,i)=>({
+No:i+1,
+Resi:x.resi,
+Waktu:x.waktu
+})
+)
+);
+
+XLSX.utils.book_append_sheet(
+wb,
+sheet,
+name
+);
+
+}
+
+addSheet("J&T",jt);
+addSheet("SPX",spx);
+addSheet("Lazada",laz);
+addSheet("Lainnya",other);
+
+XLSX.writeFile(
+wb,
+"hasil_scan.xlsx"
+);
+
+}
+
+render();
 
 </script>
 
