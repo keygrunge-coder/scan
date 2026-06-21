@@ -12,7 +12,7 @@ function startCamera() {
     if (typeof Html5Qrcode === "undefined") {
         console.error("Html5Qrcode belum dimuat");
         document.getElementById("status-message").innerText =
-            "Library scanner belum dimuat";
+            "Scanner library tidak ditemukan";
         return;
     }
 
@@ -33,12 +33,10 @@ function startCamera() {
             html5QrCode.pause(true);
 
             saveResi(decodedText.trim());
-
         }
     ).catch(err => {
 
         console.error(err);
-
         document.getElementById("status-message").innerText =
             "Kamera gagal diakses";
     });
@@ -46,36 +44,51 @@ function startCamera() {
 
 async function saveResi(resi) {
 
+    const resiUpper = resi.toUpperCase();
+
     document.getElementById("status-message").innerText =
-        "Mengirim: " + resi;
+        "Mengirim: " + resiUpper;
 
     try {
 
         const response = await fetch(APP_URL, {
             method: "POST",
-            mode: "cors",
             headers: {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
                 action: "scanPengiriman",
-                resi: resi.toUpperCase()
+                resi: resiUpper
             })
         });
 
         const result = await response.json();
 
-        console.log(result);
+        console.log("RESULT:", result);
 
-        document.getElementById("status-message").innerText =
-            "Berhasil: " + resi;
+        if (result.status === "success") {
+            document.getElementById("status-message").innerText =
+                "BERHASIL: " + resiUpper;
+        } 
+        else if (result.status === "duplicate_updated") {
+            document.getElementById("status-message").innerText =
+                "DUPLIKAT: " + resiUpper;
+        } 
+        else if (result.status === "already_marked_as_duplicate") {
+            document.getElementById("status-message").innerText =
+                "SUDAH DOUBLE: " + resiUpper;
+        } 
+        else {
+            document.getElementById("status-message").innerText =
+                "ERROR STATUS: " + result.status;
+        }
 
     } catch (err) {
 
         console.error(err);
 
         document.getElementById("status-message").innerText =
-            "Gagal koneksi";
+            "Gagal koneksi ke server";
 
     } finally {
 
