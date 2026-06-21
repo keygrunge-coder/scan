@@ -1,36 +1,57 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SEKARFOOTWEAR - PUSAT KOMANDO V5</title>
-    <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="style.css"> 
-    <script src="https://unpkg.com/html5-qrcode"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Scanner Paket Keluar V5</title>
+
+<!-- CSS terpisah -->
+<link rel="stylesheet" href="style.css">
+
 </head>
 <body>
 
-    <div class="header-box">
-        <h3>📦 SCANNER PAKET KELUAR V5</h3>
-        <a href="retur.html" class="btn-nav">🔄 Pindah ke Scan RETUR</a>
-        <a href="upload.html" class="btn-nav">🔄 Upload CSV</a>
+<div class="header-box">
+    <h3>📦 SCANNER PAKET KELUAR V5</h3>
+
+    <a href="retur.html" class="btn-nav">🔄 Pindah ke Scan RETUR</a>
+    <a href="upload.html" class="btn-nav">📤 Upload CSV</a>
+</div>
+
+<div class="dash-container">
+    <div class="dash-card">
+        <h4>Hari Ini</h4>
+        <p id="load-hari-ini">0</p>
     </div>
 
-    <div class="dash-container">
-        <div class="dash-card"><h4>Hari Ini</h4><p id="load-hari-ini">0</p></div>
-        <div class="dash-card"><h4>Hari Lalu</h4><p id="load-kemarin">0</p></div>
-        <div class="dash-card"><h4>Minggu Ini</h4><p id="load-minggu">0</p></div>
+    <div class="dash-card">
+        <h4>Hari Lalu</h4>
+        <p id="load-kemarin">0</p>
     </div>
 
-    <div id="bca-indicator"></div>
-    <div id="status-message">Menyalakan Kamera...</div>
-
-    <div class="card">
-        <div id="reader"></div>
-        <button id="startBtn" class="btn btn-primary">Aktifkan Kamera Scanner</button>
+    <div class="dash-card">
+        <h4>Minggu Ini</h4>
+        <p id="load-minggu">0</p>
     </div>
+</div>
 
-    <script src="config.js"></script>
-    <script src="script.js"></script> 
+<div id="status-message">Menyalakan Kamera...</div>
+
+<div class="card">
+    <div id="reader"></div>
+
+    <button id="startBtn" class="btn btn-primary">
+        Aktifkan Kamera Scanner
+    </button>
+</div>
+
+<!-- LIBRARY WAJIB -->
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<!-- CONFIG + SCRIPT -->
+<script src="config.js"></script>
+<script src="script.js"></script>
+
 </body>
 </html>
